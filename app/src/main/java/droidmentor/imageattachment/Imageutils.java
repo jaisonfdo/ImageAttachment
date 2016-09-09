@@ -47,14 +47,9 @@ public class Imageutils
 
     int from=0;
 
-    public Imageutils(Context context) {
+    public Imageutils(Activity act) {
 
-        this.context=context;
-    }
-
-    public Imageutils(Context context, Activity act) {
-
-        this.context=context;
+        this.context=act;
         this.current_activity = act;
         imageAttachment_callBack=(ImageAttachmentListener)context;
     }
@@ -383,7 +378,21 @@ public class Imageutils
     {
         this.from=from;
 
-        final CharSequence[] items={"Camera","Gallery"};
+        final CharSequence[] items;
+
+        if(isDeviceSupportCamera())
+        {
+            items=new CharSequence[2];
+            items[0]="Camera";
+            items[1]="Gallery";
+        }
+
+        else
+        {
+            items=new CharSequence[1];
+            items[0]="Gallery";
+        }
+
         android.app.AlertDialog.Builder alertdialog = new android.app.AlertDialog.Builder(current_activity);
         alertdialog.setTitle("Add Image");
         alertdialog.setItems(items, new DialogInterface.OnClickListener() {
@@ -544,7 +553,7 @@ public class Imageutils
                         file_name =selected_path.substring(selected_path.lastIndexOf("/")+1);
                        // Log.i("file","name"+file_name);
                         bitmap =compressImage(imageUri.toString(),816,612);
-                        imageAttachment_callBack.image_attachment(from, file_name, bitmap);
+                        imageAttachment_callBack.image_attachment(from, file_name, bitmap,imageUri);
                     }
                     catch(Exception e)
                     {
@@ -567,7 +576,7 @@ public class Imageutils
                         selected_path=getRealPathFromURI(selectedImage.getPath());
                         file_name =selected_path.substring(selected_path.lastIndexOf("/")+1);
                         bitmap =compressImage(selectedImage.toString(),816,612);
-                        imageAttachment_callBack.image_attachment(from, file_name, bitmap);
+                        imageAttachment_callBack.image_attachment(from, file_name, bitmap,selectedImage);
                     }
                     catch(Exception e)
                     {
@@ -582,6 +591,54 @@ public class Imageutils
 
     }
 
+    /**
+     * Get image from Uri
+     *
+     * @param uri
+     * @param height
+     * @param width
+     * @return
+     */
+    public Bitmap getImage_FromUri(Uri uri,float height,float width)
+    {
+        Bitmap bitmap=null;
+
+        try
+        {
+            bitmap=compressImage(uri.toString(),height,width);
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+
+        return bitmap;
+    }
+
+    /**
+     * Get filename from URI
+     * @param uri
+     * @return
+     */
+    public String getFileName_from_Uri(Uri uri)
+    {
+        String path=null,file_name=null;
+
+        try {
+
+            path = getRealPathFromURI(uri.getPath());
+            file_name = path.substring(path.lastIndexOf("/") + 1);
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            return null;
+        }
+
+        return file_name;
+
+    }
+
 
     /**
      * Check Image Exist (or) Not
@@ -591,7 +648,7 @@ public class Imageutils
      * @return
      */
 
-    public boolean imagecheck(String file_name,String file_path)
+    public boolean checkimage(String file_name,String file_path)
     {
         boolean flag;
         path = new File(file_path);
@@ -697,6 +754,12 @@ public class Imageutils
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    // Image Attachment Callback
+
+    public interface ImageAttachmentListener {
+        public void image_attachment(int from, String filename, Bitmap file, Uri uri);
     }
 
 

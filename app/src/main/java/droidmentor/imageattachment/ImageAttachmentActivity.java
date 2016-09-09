@@ -2,17 +2,17 @@ package droidmentor.imageattachment;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.ImageView;
-import android.widget.Toast;
 
 import java.io.File;
 
-public class ImageAttachmentActivity extends AppCompatActivity implements ImageAttachmentListener {
+public class ImageAttachmentActivity extends AppCompatActivity implements Imageutils.ImageAttachmentListener {
 
 
     ImageView iv_attachment;
@@ -32,21 +32,14 @@ public class ImageAttachmentActivity extends AppCompatActivity implements ImageA
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_image_attachment);
 
-        imageutils =new Imageutils(this,this);
+        imageutils =new Imageutils(this);
 
         iv_attachment=(ImageView)findViewById(R.id.imageView);
 
         iv_attachment.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (!imageutils.isDeviceSupportCamera()) {
-                    Toast.makeText(ImageAttachmentActivity.this,"Sorry! Your device doesn't support camera",Toast.LENGTH_LONG).show();
-                }
-                else
-                {
-                    imageutils.imagepicker(1);
-                }
-
+                imageutils.imagepicker(1);
             }
         });
 
@@ -66,7 +59,7 @@ public class ImageAttachmentActivity extends AppCompatActivity implements ImageA
     }
 
     @Override
-    public void image_attachment(int from, String filename, Bitmap file) {
+    public void image_attachment(int from, String filename, Bitmap file, Uri uri) {
         this.bitmap=file;
         this.file_name=filename;
         iv_attachment.setImageBitmap(file);
