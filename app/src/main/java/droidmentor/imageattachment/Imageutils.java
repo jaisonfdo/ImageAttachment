@@ -92,16 +92,18 @@ public class Imageutils
 
     public String getPath(Uri uri)
     {
-        String[] projection = {MediaStore.Images.Media.DATA};
-        Cursor cursor = context.getContentResolver().query(uri, projection, null, null, null);
+        String[] projection = { MediaStore.Images.Media.DATA };
+        Cursor cursor = this.context.getContentResolver().query(uri, projection, null, null, null);
         int column_index = 0;
         if (cursor != null) {
             column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+            cursor.moveToFirst();
+            String path=cursor.getString(column_index);
+            cursor.close();
+            return path;
         }
-        cursor.moveToFirst();
-		String path=cursor.getString(column_index);
-		cursor.close();
-        return path;
+        else
+            return uri.getPath();
     }
 
     /**
@@ -573,7 +575,7 @@ public class Imageutils
                     try
                     {
                         selected_path=null;
-                        selected_path=getRealPathFromURI(selectedImage.getPath());
+                        selected_path=getPath(selectedImage);
                         file_name =selected_path.substring(selected_path.lastIndexOf("/")+1);
                         bitmap =compressImage(selectedImage.toString(),816,612);
                         imageAttachment_callBack.image_attachment(from, file_name, bitmap,selectedImage);
