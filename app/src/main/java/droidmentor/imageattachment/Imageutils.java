@@ -20,6 +20,7 @@ import android.os.Build;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.util.Base64;
@@ -31,27 +32,44 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+import static android.content.ContentValues.TAG;
+
 @SuppressLint("SdCardPath")
 public class Imageutils
 {
 
 
     Context context;
-    Activity current_activity;
+    private Activity current_activity;
+    private Fragment current_fragment;
 
-    ImageAttachmentListener imageAttachment_callBack;
+    private ImageAttachmentListener imageAttachment_callBack;
 
-    String selected_path="";
-    Uri imageUri;
-    File path = null;
+    private String selected_path="";
+    private Uri imageUri;
+    private File path = null;
 
-    int from=0;
+    private int from=0;
+    private boolean isFragment=false;
 
     public Imageutils(Activity act) {
 
         this.context=act;
         this.current_activity = act;
         imageAttachment_callBack=(ImageAttachmentListener)context;
+    }
+
+    public Imageutils(Activity act,Fragment fragment,boolean isFragment) {
+
+        this.context=act;
+        this.current_activity = act;
+        imageAttachment_callBack= (ImageAttachmentListener) fragment;
+        if(isFragment)
+        {
+            this.isFragment=true;
+            current_fragment=fragment;
+        }
+
     }
 
     /**
@@ -114,7 +132,7 @@ public class Imageutils
      */
     public Bitmap StringToBitMap(String encodedString){
         try {
-            byte [] encodeByte= Base64.decode(encodedString,Base64.DEFAULT);
+            byte [] encodeByte= Base64.decode(encodedString, Base64.DEFAULT);
             Bitmap bitmap= BitmapFactory.decodeByteArray(encodeByte, 0, encodeByte.length);
             return bitmap;
         } catch(Exception e) {
@@ -132,10 +150,10 @@ public class Imageutils
      */
 
     public String BitMapToString(Bitmap bitmap){
-        ByteArrayOutputStream baos=new  ByteArrayOutputStream();
+        ByteArrayOutputStream baos=new ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.PNG,80, baos);
         byte [] b=baos.toByteArray();
-        String temp=Base64.encodeToString(b, Base64.DEFAULT);
+        String temp= Base64.encodeToString(b, Base64.DEFAULT);
         return temp;
     }
 
@@ -168,7 +186,7 @@ public class Imageutils
      */
 
 
-    public Bitmap compressImage(String imageUri,float height,float width) {
+    public Bitmap compressImage(String imageUri, float height, float width) {
 
         String filePath = getRealPathFromURI(imageUri);
         Bitmap scaledBitmap = null;
@@ -223,7 +241,7 @@ public class Imageutils
         options.inTempStorage = new byte[16 * 1024];
 
         try {
-        //  load the bitmap from its path
+            //  load the bitmap from its path
             bmp = BitmapFactory.decodeFile(filePath, options);
         } catch (OutOfMemoryError exception) {
             exception.printStackTrace();
@@ -337,7 +355,10 @@ public class Imageutils
 
         if (Build.VERSION.SDK_INT >= 23)
         {
-            permission_check(1);
+            if(isFragment)
+                permission_check_fragment(1);
+            else
+                permission_check(1);
         }
         else
         {
@@ -358,7 +379,10 @@ public class Imageutils
 
         if (Build.VERSION.SDK_INT >= 23)
         {
-            permission_check(2);
+            if(isFragment)
+                permission_check_fragment(2);
+            else
+                permission_check(2);
         }
         else
         {
@@ -402,7 +426,7 @@ public class Imageutils
             public void onClick(DialogInterface dialog, int item) {
                 if (items[item].equals("Camera"))
                 {
-                   launchCamera(from);
+                    launchCamera(from);
                 }
                 else if (items[item].equals("Gallery"))
                 {
@@ -455,6 +479,52 @@ public class Imageutils
     }
 
 
+    /**
+     * Check permission
+     *
+     * @param code
+     */
+
+    public void permission_check_fragment(final int code)
+    {
+        Log.d(TAG, "permission_check_fragment: "+code);
+        int hasWriteContactsPermission = ContextCompat.checkSelfPermission(current_activity,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE);
+
+        if (hasWriteContactsPermission != PackageManager.PERMISSION_GRANTED)
+
+        {
+            if (!ActivityCompat.shouldShowRequestPermissionRationale(current_activity,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+
+                showMessageOKCancel("For adding images , You need to provide permission to access your files",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+
+                                current_fragment.requestPermissions(
+                                        new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                                        code);
+                            }
+                        });
+                return;
+            }
+
+            current_fragment.requestPermissions(
+                    new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    code);
+            return;
+        }
+
+        if(code==1)
+            camera_call();
+        else if(code==2)
+            galley_call();
+    }
+
+
+
+
     private void showMessageOKCancel(String message, DialogInterface.OnClickListener okListener) {
         new AlertDialog.Builder(current_activity)
                 .setMessage(message)
@@ -476,7 +546,11 @@ public class Imageutils
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
         Intent intent1 = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         intent1.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
-        current_activity.startActivityForResult(intent1, 0);
+
+        if(isFragment)
+            current_fragment.startActivityForResult(intent1,0);
+        else
+            current_activity.startActivityForResult(intent1, 0);
     }
 
     /**
@@ -486,10 +560,15 @@ public class Imageutils
 
     public void galley_call()
     {
+        Log.d(TAG, "galley_call: ");
 
         Intent intent2 = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
         intent2.setType("image/*");
-        current_activity.startActivityForResult(intent2, 1);
+
+        if(isFragment)
+            current_fragment.startActivityForResult(intent2,1);
+        else
+            current_activity.startActivityForResult(intent2, 1);
 
     }
 
@@ -509,7 +588,7 @@ public class Imageutils
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     camera_call();
                 } else {
-                    Toast.makeText(current_activity, "Permission denied",Toast.LENGTH_LONG).show();
+                    Toast.makeText(current_activity, "Permission denied", Toast.LENGTH_LONG).show();
                 }
                 break;
 
@@ -519,7 +598,7 @@ public class Imageutils
                     galley_call();
                 } else {
 
-                    Toast.makeText(current_activity, "Permission denied",Toast.LENGTH_LONG).show();
+                    Toast.makeText(current_activity, "Permission denied", Toast.LENGTH_LONG).show();
                 }
                 break;
         }
@@ -529,7 +608,7 @@ public class Imageutils
     /**
      * Intent ActivityResult
      *
-      * @param requestCode
+     * @param requestCode
      * @param resultCode
      * @param data
      */
@@ -551,9 +630,9 @@ public class Imageutils
                     {
                         selected_path=null;
                         selected_path=getPath(imageUri);
-                       // Log.i("selected","path"+selected_path);
+                        // Log.i("selected","path"+selected_path);
                         file_name =selected_path.substring(selected_path.lastIndexOf("/")+1);
-                       // Log.i("file","name"+file_name);
+                        // Log.i("file","name"+file_name);
                         bitmap =compressImage(imageUri.toString(),816,612);
                         imageAttachment_callBack.image_attachment(from, file_name, bitmap,imageUri);
                     }
@@ -601,7 +680,7 @@ public class Imageutils
      * @param width
      * @return
      */
-    public Bitmap getImage_FromUri(Uri uri,float height,float width)
+    public Bitmap getImage_FromUri(Uri uri, float height, float width)
     {
         Bitmap bitmap=null;
 
@@ -650,12 +729,12 @@ public class Imageutils
      * @return
      */
 
-    public boolean checkimage(String file_name,String file_path)
+    public boolean checkimage(String file_name, String file_path)
     {
         boolean flag;
         path = new File(file_path);
 
-        File file = new File (path,file_name);
+        File file = new File(path,file_name);
         if (file.exists ())
         {
             Log.i("file","exists");
@@ -680,11 +759,11 @@ public class Imageutils
      * @return
      */
 
-    public Bitmap getImage(String file_name,String file_path)
+    public Bitmap getImage(String file_name, String file_path)
     {
 
         path = new File(file_path);
-        File file = new File (path,file_name);
+        File file = new File(path,file_name);
 
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inPreferredConfig = Bitmap.Config.ARGB_8888;
@@ -709,7 +788,7 @@ public class Imageutils
      */
 
 
-    public void createImage(Bitmap bitmap, String file_name,String filepath,boolean file_replace)
+    public void createImage(Bitmap bitmap, String file_name, String filepath, boolean file_replace)
     {
 
         path = new File(filepath);
@@ -719,14 +798,14 @@ public class Imageutils
             path.mkdirs();
         }
 
-        File file = new File (path,file_name);
+        File file = new File(path,file_name);
 
         if (file.exists ())
         {
             if(file_replace)
             {
                 file.delete ();
-                file = new File (path,file_name);
+                file = new File(path,file_name);
                 store_image(file,bitmap);
                 Log.i("file","replaced");
             }
@@ -745,7 +824,7 @@ public class Imageutils
      * @param file
      * @param bmp
      */
-    public void store_image(File file,Bitmap bmp)
+    public void store_image(File file, Bitmap bmp)
     {
         try {
             FileOutputStream out = new FileOutputStream(file);
