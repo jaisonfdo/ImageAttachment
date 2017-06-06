@@ -3,6 +3,7 @@ package droidmentor.imageattachment;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.Fragment;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -19,8 +20,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.util.Base64;
@@ -31,9 +32,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.util.Date;
 
 import static android.content.ContentValues.TAG;
 
+@SuppressWarnings({"WeakerAccess", "JavaDoc", "unused"})
 @SuppressLint("SdCardPath")
 public class Imageutils
 {
@@ -45,7 +49,6 @@ public class Imageutils
 
     private ImageAttachmentListener imageAttachment_callBack;
 
-    private String selected_path="";
     private Uri imageUri;
     private File path = null;
 
@@ -59,6 +62,12 @@ public class Imageutils
         imageAttachment_callBack=(ImageAttachmentListener)context;
     }
 
+    public Imageutils(Activity act, ImageAttachmentListener listener) {
+        this.context = act;
+        this.current_activity = act;
+        imageAttachment_callBack = listener;
+    }
+
     public Imageutils(Activity act,Fragment fragment,boolean isFragment) {
 
         this.context=act;
@@ -69,7 +78,18 @@ public class Imageutils
             this.isFragment=true;
             current_fragment=fragment;
         }
+    }
 
+    public Imageutils(Activity act, Fragment fragment, boolean isFragment, ImageAttachmentListener listener) {
+
+        this.context = act;
+        this.current_activity = act;
+        imageAttachment_callBack = (ImageAttachmentListener) fragment;
+        if (isFragment) {
+            this.isFragment = true;
+            current_fragment = fragment;
+        }
+        imageAttachment_callBack = listener;
     }
 
     /**
@@ -165,14 +185,10 @@ public class Imageutils
      */
 
     public boolean isDeviceSupportCamera() {
-        if (this.context.getPackageManager().hasSystemFeature(
-                PackageManager.FEATURE_CAMERA)) {
-            // this device has a camera
-            return true;
-        } else {
-            // no camera on this device
-            return false;
-        }
+        // this device has a camera
+// no camera on this device
+        return this.context.getPackageManager().hasSystemFeature(
+                PackageManager.FEATURE_CAMERA);
     }
 
 
@@ -310,7 +326,9 @@ public class Imageutils
         } else {
             cursor.moveToFirst();
             int index = cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA);
-            return cursor.getString(index);
+            String res = cursor.getString(index);
+            cursor.close();
+            return res;
         }
     }
 
@@ -386,7 +404,7 @@ public class Imageutils
         }
         else
         {
-            galley_call();
+            gallery_call();
         }
     }
 
@@ -463,19 +481,22 @@ public class Imageutils
                                         code);
                             }
                         });
-                return;
+            } else {
+                ActivityCompat.requestPermissions(current_activity,
+                        new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                        code);
             }
+            if (code == 1)
+                camera_call();
+            else if (code == 2)
+                gallery_call();
 
-            ActivityCompat.requestPermissions(current_activity,
-                    new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                    code);
-            return;
         }
 
         if(code==1)
             camera_call();
         else if(code==2)
-            galley_call();
+            gallery_call();
     }
 
 
@@ -492,7 +513,6 @@ public class Imageutils
                 Manifest.permission.WRITE_EXTERNAL_STORAGE);
 
         if (hasWriteContactsPermission != PackageManager.PERMISSION_GRANTED)
-
         {
             if (!ActivityCompat.shouldShowRequestPermissionRationale(current_activity,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
@@ -501,28 +521,27 @@ public class Imageutils
                         new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
-
-                                current_fragment.requestPermissions(
+                                ActivityCompat.requestPermissions(current_activity,
                                         new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE},
                                         code);
                             }
                         });
                 return;
+            } else {
+                ActivityCompat.requestPermissions(current_activity,
+                        new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                        code);
             }
-
-            current_fragment.requestPermissions(
-                    new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                    code);
-            return;
+            if (code == 1)
+                camera_call();
+            else if (code == 2)
+                gallery_call();
         }
-
         if(code==1)
             camera_call();
         else if(code==2)
-            galley_call();
+            gallery_call();
     }
-
-
 
 
     private void showMessageOKCancel(String message, DialogInterface.OnClickListener okListener) {
@@ -558,9 +577,9 @@ public class Imageutils
      *
      */
 
-    public void galley_call()
+    public void gallery_call()
     {
-        Log.d(TAG, "galley_call: ");
+        Log.d(TAG, "gallery_call: ");
 
         Intent intent2 = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
         intent2.setType("image/*");
@@ -595,7 +614,7 @@ public class Imageutils
             case 2:
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    galley_call();
+                    gallery_call();
                 } else {
 
                     Toast.makeText(current_activity, "Permission denied", Toast.LENGTH_LONG).show();
@@ -607,32 +626,50 @@ public class Imageutils
 
     /**
      * Intent ActivityResult
+     *  @param requestCode
+     * @param resultCode
+     * @param data
+     */
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        onActivityResult(requestCode, resultCode, data, null);
+    }
+
+    /**
+     * Intent ActivityResult
      *
      * @param requestCode
      * @param resultCode
      * @param data
+     * @param fileName optional
      */
-    public void onActivityResult(int requestCode, int resultCode, Intent data)
+    public void onActivityResult(int requestCode, int resultCode, Intent data, @Nullable String fileName)
     {
         String file_name;
+        if (fileName != null) {
+            file_name = fileName;
+        } else {
+            String currentDateTimeString = DateFormat.getDateTimeInstance().format(new Date());
+            currentDateTimeString = currentDateTimeString.replaceAll(" ", "_");
+            currentDateTimeString = currentDateTimeString.replaceAll(",", "");
+            currentDateTimeString = currentDateTimeString.replaceAll(":", ".");
+            currentDateTimeString = "IMG_" + currentDateTimeString + ".jpg";
+            file_name = currentDateTimeString;
+        }
         Bitmap bitmap;
 
         switch (requestCode)
         {
             case 0:
 
-                if(resultCode==current_activity.RESULT_OK)
+                String selected_path = "";
+                if (resultCode == Activity.RESULT_OK)
                 {
 
                     Log.i("Camera Selected","Photo");
 
                     try
                     {
-                        selected_path=null;
-                        selected_path=getPath(imageUri);
-                        // Log.i("selected","path"+selected_path);
-                        file_name =selected_path.substring(selected_path.lastIndexOf("/")+1);
-                        // Log.i("file","name"+file_name);
+                        Log.i("YOYO", "name" + file_name);
                         bitmap =compressImage(imageUri.toString(),816,612);
                         imageAttachment_callBack.image_attachment(from, file_name, bitmap,imageUri);
                     }
@@ -640,22 +677,19 @@ public class Imageutils
                     {
                         e.printStackTrace();
                     }
-
-
-
                 }
                 break;
             case 1:
-                if(resultCode==current_activity.RESULT_OK)
+                if (resultCode == Activity.RESULT_OK)
                 {
                     Log.i("Gallery","Photo");
                     Uri selectedImage=data.getData();
 
                     try
                     {
-                        selected_path=null;
-                        selected_path=getPath(selectedImage);
-                        file_name =selected_path.substring(selected_path.lastIndexOf("/")+1);
+                        selected_path = null;
+                        selected_path = getPath(selectedImage);
+                        file_name = selected_path.substring(selected_path.lastIndexOf("/") + 1);
                         bitmap =compressImage(selectedImage.toString(),816,612);
                         imageAttachment_callBack.image_attachment(from, file_name, bitmap,selectedImage);
                     }
@@ -795,7 +829,10 @@ public class Imageutils
 
         if(!path.exists())
         {
-            path.mkdirs();
+            if (!path.mkdirs()) {
+                //could not make dir
+                return;
+            }
         }
 
         File file = new File(path,file_name);
@@ -840,7 +877,7 @@ public class Imageutils
     // Image Attachment Callback
 
     public interface ImageAttachmentListener {
-        public void image_attachment(int from, String filename, Bitmap file, Uri uri);
+        void image_attachment(int from, String filename, Bitmap file, Uri uri);
     }
 
 
